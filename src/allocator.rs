@@ -1,31 +1,55 @@
-use crate::{boot::MultibootInfo, io::*};
+use crate::boot::{MultibootInfo, MultibootMemoryMappedType};
+use crate::{io::*, KERNEL_START};
 use core::{alloc::GlobalAlloc, mem::size_of};
 
 #[global_allocator]
 pub static mut ALLOCATOR: Allocator = Allocator::new();
 
-pub struct Allocator {}
+pub struct Allocator {
+    mmap_addr: *mut u8,
+    mmap_size: usize,
+}
 
 impl Allocator {
     const fn new() -> Self {
-        Self {}
+        Self {
+            mmap_addr: 0 as *mut u8,
+            mmap_size: 0,
+        }
     }
 
-    pub unsafe fn init(&mut self, _multiboot_infos: &'static MultibootInfo) {
-        let a = ARENA.as_ptr() as *mut u8;
+    pub unsafe fn init(&mut self, multiboot_infos: &'static MultibootInfo) {
+        let mmap = multiboot_infos
+            .get_mmap_addrs()
+            .iter()
+            .find(|e| e.addr() == (&crate::KERNEL_START as *const u32) as u64)
+            .expect("There is at least one available memory map");
+
+        let kernel_start_addr = (&crate::KERNEL_START as *const u32) as u64;
+        let kernel_end_addr = (&crate::KERNEL_END as *const u32) as u64;
+
+        let reserved_memory_length = kernel_end_addr - kernel_start_addr;
+
+        let reallign = (mmap.len() - reserved_memory_length) % 0x4;
+        let reserved_memory_length = reserved_memory_length + reallign;
+
+        self.mmap_size = (mmap.len() - reserved_memory_length) as usize;
+        self.mmap_addr = (kernel_start_addr + reserved_memory_length) as *mut u8;
+        println!("self.mmap_addr {:?}", self.mmap_addr);
+
+        let a = self.mmap_addr;
         let header = Header {
             special: true,
             alloced: false,
-            size: ARENA_SIZE - size_of::<Header>() - size_of::<Header>(),
+            size: self.mmap_size - size_of::<Header>() - size_of::<Header>(),
         };
+
         a.copy_from_nonoverlapping((&header as *const Header) as *const u8, size_of::<Header>());
-        let a = a.add(ARENA_SIZE - size_of::<Header>());
+        println!("a {:?}", a);
+        let a = a.add(self.mmap_size - size_of::<Header>());
         a.copy_from_nonoverlapping((&header as *const Header) as *const u8, size_of::<Header>());
     }
 }
-
-const ARENA_SIZE: usize = 1 << 10;
-static mut ARENA: [u8; ARENA_SIZE] = [0; ARENA_SIZE];
 
 //#[repr(packed)]
 #[derive(Debug)]
@@ -42,10 +66,11 @@ struct Header {
 unsafe impl GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
         let size_asked = layout.size();
-        let mut a = ARENA.as_ptr() as *mut u8;
+        let mut a = self.mmap_addr;
+        println!("a {:?}", a);
         let mut header = a.cast::<Header>();
         while (*header).alloced || (*header).size < (size_asked + 2 * size_of::<Header>()) {
-            if a.addr() > ARENA.as_ptr().addr() && (*header).special {
+            if a.addr() > self.mmap_addr as usize && (*header).special {
                 panic!("Uh oh... No more memory !")
             }
             a = a

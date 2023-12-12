@@ -6,6 +6,8 @@
 #![no_std] // don't link the Rust standard library
 #![no_main] // disable all Rust-level entry points
 
+use alloc::vec;
+
 use crate::io::serial;
 use crate::io::vga;
 use core::arch::asm;
@@ -16,13 +18,18 @@ use core::panic::PanicInfo;
 mod io;
 mod allocator;
 mod boot;
+mod utils;
 
 extern crate alloc;
-use alloc::vec::Vec;
 // Include boot.s which defines _start as inline assembly in main. This allows us to do more fine
 // grained setup than if we used a naked _start function in rust. Theoretically we could use a
 // naked function + some inline asm, but this seems much more straight forward.
 global_asm!(include_str!("boot.S"));
+
+extern "C" {
+    static KERNEL_START: u32;
+    static KERNEL_END: u32;
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn kernel_main(
@@ -31,30 +38,35 @@ pub unsafe extern "C" fn kernel_main(
 ) -> ! {
     vga::init();
     let _ = serial::init();
+    unsafe { allocator::ALLOCATOR.init(multiboot_infos) }
 
-    if multiboot_magic != boot::MULTIBOOT_BOOTLOADER_MAGIC {
-        panic!("Wrong Multiboot magic, could not get infos");
-    }
-    if multiboot_infos.check_flags_for_memmap() {
-        panic!("invalid memory map given by GRUB bootloader");
+    for i in 0..100 {
+        let mut v = vec![];
+        for j in 0..i {
+            v.push(j);
+        }
+        for _ in 0..50 {
+            v.remove((utils::rng::rand() % 100) as usize);
+        }
     }
 
     let mmaps = multiboot_infos.get_mmap_addrs();
     let mut size = 0;
     for mmap in mmaps {
-        size += mmap.size();
+        println!("{:?}", mmap.r#type());
+        size += mmap.len();
     }
-    println!("total mmap size: {size}");
 
+    println!("total mmap size: {size}");
     loop {}
 }
 
 // This function is called on panic.
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    print!("Pannic'ed");
+    println!("Pannic'ed on:");
     if let Some(message) = info.message() {
-        print!(" on : `{}`", message);
+        print!("{}", message);
     }
     if let Some(location) = info.location() {
         print!(

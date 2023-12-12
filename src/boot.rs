@@ -109,6 +109,14 @@ impl MultibootMMapEntry {
         self.size
     }
 
+    pub fn addr(&self) -> u64 {
+        self.addr
+    }
+
+    pub fn len(&self) -> u64 {
+        self.len
+    }
+
     pub fn r#type(&self) -> u32 {
         self.r#type
     }
