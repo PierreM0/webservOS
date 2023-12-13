@@ -1,3 +1,4 @@
+#![feature(custom_test_frameworks)]
 #![feature(strict_provenance)]
 #![feature(const_mut_refs)]
 #![feature(panic_info_message)]
@@ -7,6 +8,7 @@
 #![no_main] // disable all Rust-level entry points
 
 use alloc::vec;
+use tinyrand::Rand;
 
 use crate::io::serial;
 use crate::io::vga;
@@ -18,7 +20,6 @@ use core::panic::PanicInfo;
 mod io;
 mod allocator;
 mod boot;
-mod utils;
 
 extern crate alloc;
 // Include boot.s which defines _start as inline assembly in main. This allows us to do more fine
@@ -40,13 +41,16 @@ pub unsafe extern "C" fn kernel_main(
     let _ = serial::init();
     unsafe { allocator::ALLOCATOR.init(multiboot_infos) }
 
+    let mut rng = tinyrand::StdRand::default();
+
     for i in 0..100 {
         let mut v = vec![];
         for j in 0..i {
             v.push(j);
         }
-        for _ in 0..50 {
-            v.remove((utils::rng::rand() % 100) as usize);
+        for _ in 0..v.len() {
+            let num = rng.next_usize() % v.len();
+            v.remove(num);
         }
     }
 

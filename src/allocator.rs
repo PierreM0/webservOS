@@ -1,5 +1,4 @@
-use crate::boot::{MultibootInfo, MultibootMemoryMappedType};
-use crate::{io::*, KERNEL_START};
+use crate::boot::MultibootInfo;
 use core::{alloc::GlobalAlloc, mem::size_of};
 
 #[global_allocator]
@@ -35,7 +34,6 @@ impl Allocator {
 
         self.mmap_size = (mmap.len() - reserved_memory_length) as usize;
         self.mmap_addr = (kernel_start_addr + reserved_memory_length) as *mut u8;
-        println!("self.mmap_addr {:?}", self.mmap_addr);
 
         let a = self.mmap_addr;
         let header = Header {
@@ -45,7 +43,6 @@ impl Allocator {
         };
 
         a.copy_from_nonoverlapping((&header as *const Header) as *const u8, size_of::<Header>());
-        println!("a {:?}", a);
         let a = a.add(self.mmap_size - size_of::<Header>());
         a.copy_from_nonoverlapping((&header as *const Header) as *const u8, size_of::<Header>());
     }
@@ -67,7 +64,6 @@ unsafe impl GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
         let size_asked = layout.size();
         let mut a = self.mmap_addr;
-        println!("a {:?}", a);
         let mut header = a.cast::<Header>();
         while (*header).alloced || (*header).size < (size_asked + 2 * size_of::<Header>()) {
             if a.addr() > self.mmap_addr as usize && (*header).special {
