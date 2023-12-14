@@ -1,30 +1,11 @@
-use core::{arch::asm, fmt::Write};
+use core::fmt::Write;
+
+use super::{inb, outb};
 
 pub static PORT: u16 = 0x3f8; // COM1
 
 pub struct SerialWriter {
     port: u16,
-}
-
-unsafe fn outb(address: u16, value: u8) {
-    asm!(r#"
-        .att_syntax
-         out %al, %dx
-         "#,
-        in("al") value,
-        in("dx") address
-    );
-}
-
-unsafe fn inb(address: u16) -> u8 {
-    let mut ret;
-    asm!(r#"
-        .att_syntax
-        in %dx, %al
-        "#,
-        in("dx") address,
-        out("al") ret);
-    ret
 }
 
 pub struct SerialWriterInitError;

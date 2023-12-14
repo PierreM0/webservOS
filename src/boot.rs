@@ -124,6 +124,7 @@ impl MultibootMMapEntry {
 
 #[derive(Debug, PartialEq, Eq)]
 #[repr(C)]
+#[allow(unused)]
 pub enum MultibootMemoryMappedType {
     Available,
     Reserved,
@@ -133,6 +134,7 @@ pub enum MultibootMemoryMappedType {
     InvalidData,
 }
 
+#[allow(unused)]
 impl MultibootMemoryMappedType {
     pub fn from_u32(value: u32) -> Self {
         match value {
@@ -146,4 +148,5 @@ impl MultibootMemoryMappedType {
     }
 }
 
+#[allow(unused)]
 pub const MULTIBOOT_BOOTLOADER_MAGIC: u32 = 0x2BADB002;

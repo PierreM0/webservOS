@@ -122,8 +122,7 @@ impl VGATerminalWriter {
 
     pub fn putchar(&mut self, c: u8) {
         if self.row >= VGA_HEIGHT {
-            unsafe { self.move_row_up(1) }
-            self.row = VGA_HEIGHT - 1;
+            self.row = 0; // FIXME
         }
         if c == b'\n' {
             self.row += 1;
@@ -144,20 +143,6 @@ impl VGATerminalWriter {
     pub fn write(&mut self, data: &[u8]) {
         for c in data {
             self.putchar(*c);
-        }
-    }
-
-    unsafe fn move_row_up(&mut self, arg: usize) {
-        let arg = arg;
-        let buf_len = VGA_WIDTH * VGA_HEIGHT;
-        for i in 0..buf_len {
-            if (VGA_WIDTH * arg + i) <= buf_len {
-                *self.buffer.add(i) = *self.buffer.add(VGA_WIDTH * arg + i);
-            } else {
-                let x = buf_len % VGA_WIDTH;
-                let y = buf_len % VGA_HEIGHT;
-                self.putentryat(b' ', self.color, x, y);
-            }
         }
     }
 }

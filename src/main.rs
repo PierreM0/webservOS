@@ -1,4 +1,3 @@
-#![feature(custom_test_frameworks)]
 #![feature(strict_provenance)]
 #![feature(const_mut_refs)]
 #![feature(panic_info_message)]
@@ -8,7 +7,6 @@
 #![no_main] // disable all Rust-level entry points
 
 use alloc::vec;
-use tinyrand::Rand;
 
 use crate::io::serial;
 use crate::io::vga;
@@ -20,6 +18,7 @@ use core::panic::PanicInfo;
 mod io;
 mod allocator;
 mod boot;
+mod drivers;
 
 extern crate alloc;
 // Include boot.s which defines _start as inline assembly in main. This allows us to do more fine
@@ -35,33 +34,31 @@ extern "C" {
 #[no_mangle]
 pub unsafe extern "C" fn kernel_main(
     multiboot_infos: &'static boot::MultibootInfo,
-    multiboot_magic: u32,
+    _multiboot_magic: u32,
 ) -> ! {
     vga::init();
     let _ = serial::init();
     unsafe { allocator::ALLOCATOR.init(multiboot_infos) }
 
-    let mut rng = tinyrand::StdRand::default();
+    println!("Boot working.");
+    println!("Allocator working:");
+    let v = vec![1, 2, 3, 4];
+    println!("    A vector: {v:?}");
+    let mut m = alloc::collections::BTreeMap::new();
+    m.insert("bonjour", 7);
+    m.insert("salut", 5);
+    println!("    A map: {m:?}");
 
-    for i in 0..100 {
-        let mut v = vec![];
-        for j in 0..i {
-            v.push(j);
-        }
-        for _ in 0..v.len() {
-            let num = rng.next_usize() % v.len();
-            v.remove(num);
-        }
-    }
+    let pci_devices_headers = check_all_buses_smart();
+    let rtl8139 = pci_devices_headers
+        .iter()
+        .find(|e| e.device_id == 0x8139 && e.vendor_id == 0x10ec)
+        .expect("good qemu config");
 
-    let mmaps = multiboot_infos.get_mmap_addrs();
-    let mut size = 0;
-    for mmap in mmaps {
-        println!("{:?}", mmap.r#type());
-        size += mmap.len();
-    }
+    println!("network card: {rtl8139:#1x?}");
 
-    println!("total mmap size: {size}");
+    // drivers::rtl8139::test(rtl8139);
+
     loop {}
 }
 
